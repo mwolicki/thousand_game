@@ -76,20 +76,19 @@ module Game =
         | Bidding of BiddingState
         | PlayRound of PlayRoundState
 
+    type PlayGameState = { Players : Players; Score:Score; RoundState : RoundState }
+
     type GameState =
-        | NotStated
-        | Game of Players * Score * RoundState
+        | Game of PlayGameState
         | Finished of Players * Score * winner:Player
 
     let cardDeck = [ for s in [ Club; Diamond; Heart; Spade ] do
                         for r in [ Rank9; Jack; Queen; King; Rank10; Ace ] ->
                             { Suit = s; Rank = r } ]
     let rnd = Random()
-    let randomCardDeck () =
-        cardDeck |> List.sortBy (fun _ -> rnd.Next ())
+    let randomCardDeck (rnd:Random) = cardDeck |> List.sortBy (fun _ -> rnd.Next ())
 
     let cardSort = List.sortBy(fun card -> card.Suit.Order, card.Rank.Order)
-
 
     let deckSplit (deck:Deck) =
         { Stock = deck |> List.take 3 |> cardSort
@@ -97,8 +96,12 @@ module Game =
           Player2 = deck |> List.skip 10 |> List.take 7 |> cardSort
           Player3 = deck |> List.skip 17 |> List.take 7 |> cardSort }
 
-    
-    
+    let newGame player1 player2 player3 = 
+        let players : Players = { Player1 = player1; Player2 = player2; Player3 = player3 }
+        let score = { Player1 = 0; Player2 = 0; Player3 = 0 }
+        let shuffledCards = randomCardDeck rnd |> deckSplit
+        let gameState = { Players = players; Score = score; RoundState = Shuffled shuffledCards }
+        Game gameState
 
 open Fable.Core
 open Fable.Core.JsInterop

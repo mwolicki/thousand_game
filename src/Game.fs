@@ -90,9 +90,9 @@ let cardSort = List.sortBy(fun card -> card.Suit.Order, card.Rank.Order)
 
 let deckSplit (deck:Deck) =
     { Stock = deck |> List.take 3 |> cardSort
-        Player1 = deck |> List.skip 3 |> List.take 7 |> cardSort
-        Player2 = deck |> List.skip 10 |> List.take 7 |> cardSort
-        Player3 = deck |> List.skip 17 |> List.take 7 |> cardSort }
+      Player1 = deck |> List.skip 3 |> List.take 7 |> cardSort
+      Player2 = deck |> List.skip 10 |> List.take 7 |> cardSort
+      Player3 = deck |> List.skip 17 |> List.take 7 |> cardSort }
 
 let newGame player1 player2 player3 = 
     let players : Players = { Player1 = player1; Player2 = player2; Player3 = player3 }

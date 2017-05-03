@@ -1,4 +1,4 @@
-module thousand
+module Thousand
 
 module Game =
     open System

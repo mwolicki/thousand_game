@@ -60,9 +60,7 @@ type Cards = Card list
 
 type ShuffledCards = { Stock : Cards; Player1 : Cards; Player2: Cards; Player3 : Cards } 
 
-type BidState =
-    | Pass
-    | Bid of uint16
+type BidState = Pass | Bid of uint16
 
 type BiddingState = { Bids: Map<Player, BidState>; CurrentPlayer : Player; Cards: ShuffledCards }
 type PlayRoundState = { BiddingWinner: Player

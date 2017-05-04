@@ -50,8 +50,10 @@ with
                                     | Player3 _ -> p.Player1
     member p.PreviousPlayer = function Player1 _ -> p.Player3 | Player2 _ -> p.Player1
                                         | Player3 _ -> p.Player2
+    member p.Item with get (x) = match (x-1) % 3 with 0 -> p.Player1 | 1 -> p.Player2 | _ -> p.Player3
 
-type Score = { Player1: int; Player2: int; Player3: int }
+type ScoreAdditions = Obligation | Bomb
+type Score = { Player1: int * ScoreAdditions Set; Player2: int  * ScoreAdditions Set; Player3: int * ScoreAdditions Set }
 
 type Deck = Card list
 type Cards = Card list
@@ -60,25 +62,23 @@ type ShuffledCards = { Stock : Cards; Player1 : Cards; Player2: Cards; Player3 :
 
 type BidState =
     | Pass
-    | Obligated
     | Bid of uint16
 
-type BiddingState = { Bids: Map<Player, BidState>; CurrentPlayer : Player; Cards: Map<Player, Cards> }
+type BiddingState = { Bids: Map<Player, BidState>; CurrentPlayer : Player; Cards: ShuffledCards }
 type PlayRoundState = { BiddingWinner: Player
                         CurrentPlayer : Player
                         Cards: Map<Player, Cards>
                         CardsOnTable : Card list }
 
 type RoundState =
-    | Shuffled of ShuffledCards
     | Bidding of BiddingState
     | PlayRound of PlayRoundState
 
-type PlayGameState = { Players : Players; Score:Score; RoundState : RoundState }
+type PlayGameState = { Players : Players; Score:Score list; RoundState : RoundState }
 
 type GameState =
     | Game of PlayGameState
-    | Finished of Players * Score * winner:Player
+    | Finished of Players * Score list * winner:Player
 
 let cardDeck = [ for s in [ Club; Diamond; Heart; Spade ] do
                     for r in [ Rank9; Jack; Queen; King; Rank10; Ace ] ->
@@ -94,9 +94,31 @@ let deckSplit (deck:Deck) =
       Player2 = deck |> List.skip 10 |> List.take 7 |> cardSort
       Player3 = deck |> List.skip 17 |> List.take 7 |> cardSort }
 
-let newGame player1 player2 player3 = 
-    let players : Players = { Player1 = player1; Player2 = player2; Player3 = player3 }
-    let score = { Player1 = 0; Player2 = 0; Player3 = 0 }
-    let shuffledCards = randomCardDeck rnd |> deckSplit
-    let gameState = { Players = players; Score = score; RoundState = Shuffled shuffledCards }
-    Game gameState
+let newGame player1 player2 player3 rnd=
+    match player1, player2, player3 with
+    |Player1 _, Player2 _, Player3 _ ->
+        let players : Players = { Player1 = player1; Player2 = player2; Player3 = player3 }
+        let shuffledCards = randomCardDeck rnd |> deckSplit    
+        let obligatedPlayer = rnd.Next 3 + 1
+        let getObligation player = if obligatedPlayer = player then Set [Obligation] else Set.empty
+        let score = { Player1 = 0, getObligation 1; Player2 = 0, getObligation 2; Player3 = 0, getObligation 3}
+        let biddingState = { Bids = Map.empty; CurrentPlayer = players.[obligatedPlayer + 1]; Cards = shuffledCards }
+        let gameState = { Players = players; Score = [score]; RoundState = Bidding biddingState }
+        Game gameState
+    | _ -> failwith "Unsupported players types."
+
+type BiddingEvent =
+| Bid of bid:int
+| Pass
+
+type RoundEvent =
+| PutCard of Card
+
+type GameEvents =
+| BiddingEvent of Player * BiddingEvent
+| RoundEvent of Player * RoundEvent
+
+let processEvent gameState event =
+    match gameState, event with
+    | Game { RoundState = Bidding _ }, BiddingEvent (player, event) -> 
+        gameState

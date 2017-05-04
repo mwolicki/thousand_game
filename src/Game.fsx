@@ -10,3 +10,12 @@ let game =
     let rnd = System.Random 1
     newGame player1 player2 player3 rnd
 
+let game2 =
+    [ player1, Bid 110us
+      player2, Bid 120us
+      player3, Bid 130us
+      player1, Pass
+      player2, Bid 140us
+      player3, Pass ]
+    |> List.map BiddingEvent
+    |> List.fold processEvent game

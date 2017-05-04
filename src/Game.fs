@@ -107,18 +107,22 @@ let newGame player1 player2 player3 rnd=
         Game gameState
     | _ -> failwith "Unsupported players types."
 
-type BiddingEvent =
-| Bid of bid:int
-| Pass
-
 type RoundEvent =
 | PutCard of Card
 
 type GameEvents =
-| BiddingEvent of Player * BiddingEvent
+| BiddingEvent of Player * BidState
 | RoundEvent of Player * RoundEvent
+
+[<AutoOpen>]
+module private Game =
+    ()
 
 let processEvent gameState event =
     match gameState, event with
-    | Game { RoundState = Bidding _ }, BiddingEvent (player, event) -> 
-        gameState
+    | Game ({ RoundState = Bidding biddingState; Players = ps } as state), BiddingEvent (player, event) 
+        when player = biddingState.CurrentPlayer -> 
+        Game { state with 
+                        RoundState = Bidding { biddingState with 
+                                                 CurrentPlayer = ps.NextPlayer player
+                                                 Bids = biddingState.Bids.Add (player, event) } }

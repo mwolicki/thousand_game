@@ -19,3 +19,5 @@ let game2 =
       player3, Pass ]
     |> List.map BiddingEvent
     |> List.fold processEvent game
+
+

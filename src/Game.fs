@@ -42,7 +42,9 @@ type PlayerType =
     | RemoteHuman of name:Name * address:string
 
 type Player = Player1 of PlayerType | Player2 of PlayerType | Player3 of PlayerType
-with member p.PlayerType = match p with Player1 pt | Player2 pt | Player3 pt -> pt
+with 
+    member p.Number = match p with Player1 _ -> 1 | Player2 _ -> 2 | Player3 _ -> 3
+    member p.PlayerType = match p with Player1 pt | Player2 pt | Player3 pt -> pt
 
 type Players = { Player1: Player; Player2: Player; Player3: Player }
 with 
@@ -68,8 +70,12 @@ type PlayRoundState = { BiddingWinner: Player
                         Cards: Map<Player, Cards>
                         CardsOnTable : Card list }
 
+type PassCardsState = { BiddingWinner: Player
+                        Cards: Map<Player, Cards> }
+
 type RoundState =
     | Bidding of BiddingState
+    | PassCards of PassCardsState
     | PlayRound of PlayRoundState
 
 type PlayGameState = { Players : Players; Score:Score list; RoundState : RoundState }
@@ -94,7 +100,7 @@ let deckSplit (deck:Deck) =
 
 let newGame player1 player2 player3 rnd=
     match player1, player2, player3 with
-    |Player1 _, Player2 _, Player3 _ ->
+    | Player1 _, Player2 _, Player3 _ ->
         let players : Players = { Player1 = player1; Player2 = player2; Player3 = player3 }
         let shuffledCards = randomCardDeck rnd |> deckSplit    
         let obligatedPlayer = rnd.Next 3 + 1
@@ -116,11 +122,57 @@ type GameEvents =
 module private Game =
     ()
 
+
+let tryFinishBidding = function
+| Game ({ RoundState = Bidding biddingState; Players = ps } as state)
+    when List.ofSeq biddingState.Bids
+         |> List.map (fun x-> x.Value) 
+         |> List.filter (function Pass -> true | _ -> false)
+         |> List.length = 2 -> 
+
+    let biddingWinner = 
+        let winningBid = 
+            biddingState.Bids 
+            |> Seq.maxBy (fun x -> match x.Value with Bid x -> x | Pass -> 0us)
+        winningBid.Key
+
+    let cards = 
+        match biddingWinner with
+        | Player1 _ ->
+            [ ps.Player1, biddingState.Cards.Player1 @ biddingState.Cards.Stock |> cardSort
+              ps.Player2, biddingState.Cards.Player2
+              ps.Player3, biddingState.Cards.Player3 ]
+        | Player2 _ ->
+            [ ps.Player1, biddingState.Cards.Player1
+              ps.Player2, biddingState.Cards.Player1 @ biddingState.Cards.Stock |> cardSort
+              ps.Player3, biddingState.Cards.Player3 ]
+        | Player3 _ ->
+            [ ps.Player1, biddingState.Cards.Player1
+              ps.Player2, biddingState.Cards.Player2
+              ps.Player3, biddingState.Cards.Player1 @ biddingState.Cards.Stock |> cardSort ]
+        |> Map.ofList
+    Game { state with 
+                RoundState = PassCards { BiddingWinner = biddingWinner
+                                         Cards = cards } }
+ | gameState -> gameState
+
 let processEvent gameState event =
     match gameState, event with
     | Game ({ RoundState = Bidding biddingState; Players = ps } as state), BiddingEvent (player, event) 
-        when player = biddingState.CurrentPlayer -> 
+        when player = biddingState.CurrentPlayer ->
+        let currentBids = 110us :: (List.ofSeq biddingState.Bids 
+                            |> List.map (fun x-> x.Value)
+                            |> List.choose (function Bid y -> Some y | _ -> None))
+                            |> List.max
+        match event with
+        | Bid x when x < currentBids ->
+            failwith "Too low bid!"
+        | Bid x when x % 10us <> 0us ->
+            failwith "bid needs to end with 0"
+        | _ -> ()
+
         Game { state with 
-                        RoundState = Bidding { biddingState with 
-                                                 CurrentPlayer = ps.NextPlayer player
-                                                 Bids = biddingState.Bids.Add (player, event) } }
+                RoundState = Bidding { biddingState with 
+                                        CurrentPlayer = ps.NextPlayer player
+                                        Bids = biddingState.Bids.Add (player, event) } }
+        |> tryFinishBidding

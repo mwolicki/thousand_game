@@ -137,20 +137,13 @@ let tryFinishBidding = function
         winningBid.Key
 
     let cards = 
-        match biddingWinner with
-        | Player1 _ ->
-            [ ps.Player1, biddingState.Cards.Player1 @ biddingState.Cards.Stock |> cardSort
-              ps.Player2, biddingState.Cards.Player2
-              ps.Player3, biddingState.Cards.Player3 ]
-        | Player2 _ ->
-            [ ps.Player1, biddingState.Cards.Player1
-              ps.Player2, biddingState.Cards.Player1 @ biddingState.Cards.Stock |> cardSort
-              ps.Player3, biddingState.Cards.Player3 ]
-        | Player3 _ ->
-            [ ps.Player1, biddingState.Cards.Player1
-              ps.Player2, biddingState.Cards.Player2
-              ps.Player3, biddingState.Cards.Player1 @ biddingState.Cards.Stock |> cardSort ]
-        |> Map.ofList
+        let cards = biddingState.Cards
+        let map = [ ps.Player1, cards.Player1
+                    ps.Player2, cards.Player2
+                    ps.Player3, cards.Player3 ] |> Map.ofList
+        let winningCards = map.[biddingWinner]
+        map.Add (biddingWinner, winningCards @ cards.Stock |> cardSort)
+        
     Game { state with 
                 RoundState = PassCards { BiddingWinner = biddingWinner
                                          Cards = cards } }

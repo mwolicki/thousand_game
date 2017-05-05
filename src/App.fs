@@ -4,6 +4,7 @@ module Thousand
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Import
+open Game
 
 let init() =
     let canvas = Browser.document.getElementsByTagName_canvas().[0]
@@ -16,5 +17,6 @@ let init() =
     ctx.fillRect (10., 10., 55., 50.)
     ctx.fillStyle <- !^"rgba(0, 0, 200, 0.5)"
     ctx.fillRect (30., 30., 55., 50.)
+    printfn "%A" cardDeck
 
 init()

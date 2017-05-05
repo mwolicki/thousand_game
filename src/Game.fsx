@@ -20,4 +20,6 @@ let game2 =
     |> List.map BiddingEvent
     |> List.fold processEvent game
 
+let game3 = processEvent game2 <| PassCardsEvent ({ Suit = Heart; Rank = Ace }, { Suit = Heart; Rank = King })
+
 

@@ -65,12 +65,12 @@ type ShuffledCards = { Stock : Cards; Player1 : Cards; Player2: Cards; Player3 :
 type BidState = Pass | Bid of uint16
 
 type BiddingState = { Bids: Map<Player, BidState>; CurrentPlayer : Player; Cards: ShuffledCards }
-type PlayRoundState = { BiddingWinner: Player
+type PlayRoundState = { BiddingWinner: Player * uint16
                         CurrentPlayer : Player
                         Cards: Map<Player, Cards>
                         CardsOnTable : Card list }
 
-type PassCardsState = { BiddingWinner: Player
+type PassCardsState = { BiddingWinner: Player * uint16
                         Cards: Map<Player, Cards> }
 
 type RoundState =
@@ -89,9 +89,7 @@ let cardDeck = [ for s in [ Club; Diamond; Heart; Spade ] do
                         { Suit = s; Rank = r } ]
 let rnd = Random()
 let randomCardDeck (rnd:Random) = cardDeck |> List.sortBy (fun _ -> rnd.Next ())
-
 let cardSort = List.sortBy(fun card -> card.Suit.Order, card.Rank.Order)
-
 let deckSplit (deck:Deck) =
     { Stock = deck |> List.take 3 |> cardSort
       Player1 = deck |> List.skip 3 |> List.take 7 |> cardSort
@@ -116,12 +114,12 @@ type RoundEvent =
 
 type GameEvents =
 | BiddingEvent of Player * BidState
+| PassCardsEvent of Card * Card
 | RoundEvent of Player * RoundEvent
 
 [<AutoOpen>]
 module private Game =
     ()
-
 
 let tryFinishBidding = function
 | Game ({ RoundState = Bidding biddingState; Players = ps } as state)
@@ -130,11 +128,10 @@ let tryFinishBidding = function
          |> List.filter (function Pass -> true | _ -> false)
          |> List.length = 2 -> 
 
-    let biddingWinner = 
-        let winningBid = 
-            biddingState.Bids 
-            |> Seq.maxBy (fun x -> match x.Value with Bid x -> x | Pass -> 0us)
-        winningBid.Key
+    let biddingWinner, bid = 
+        biddingState.Bids 
+        |> Seq.choose (fun x -> match x.Value with Bid v -> Some (x.Key, v) | Pass -> None)
+        |> Seq.maxBy (fun (_, v) ->v)
 
     let cards = 
         let cards = biddingState.Cards
@@ -145,7 +142,7 @@ let tryFinishBidding = function
         map.Add (biddingWinner, winningCards @ cards.Stock |> cardSort)
         
     Game { state with 
-                RoundState = PassCards { BiddingWinner = biddingWinner
+                RoundState = PassCards { BiddingWinner = biddingWinner, bid
                                          Cards = cards } }
  | gameState -> gameState
 
@@ -169,3 +166,20 @@ let processEvent gameState event =
                                         CurrentPlayer = ps.NextPlayer player
                                         Bids = biddingState.Bids.Add (player, event) } }
         |> tryFinishBidding
+    | Game ({ RoundState = PassCards p } as state), PassCardsEvent (cardA, cardB) -> 
+        let player, _ = p.BiddingWinner
+        let players = p.Cards |> Seq.filter (fun kv -> player <> kv.Key) 
+        let map = 
+            [cardA; cardB] 
+            |> Seq.zip players
+            |> Seq.map (fun (kv, newCard) -> kv.Key, newCard :: kv.Value |> cardSort)
+            |> Seq.fold (fun (m:Map<Player, Cards>) (player, cards) -> m.Add (player, cards)) p.Cards
+        let cards =map.Add (player, map.[player] |> List.filter (fun x-> not <| List.contains x [cardA; cardB]))
+
+        Game { state with 
+                RoundState = PlayRound { BiddingWinner = p.BiddingWinner
+                                         CurrentPlayer = player
+                                         Cards = cards
+                                         CardsOnTable = [] } }
+
+
